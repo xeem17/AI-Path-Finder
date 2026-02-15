@@ -313,7 +313,7 @@ with c1:
     st.session_state.walls[tx, ty] = 0
     
     st.write("**Add/Remove Walls:**")
-    st.write("🟢 Start | 🔴 Target | 🟣 Wall | ⬜ Empty")
+    st.write("🔵 Start | 🔴 Target | 🟣 Wall | ⬜ Empty")
     
     wall_input = st.text_input("Enter position (row,col):", key="wall_input", placeholder="Example: 5,5")
     
