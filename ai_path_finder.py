@@ -337,6 +337,65 @@ with col1:
             except:
                 st.error("Invalid format")
 
+    st.divider()
+    st.subheader("Legend")
+    
+    legend_html = """
+    <style>
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 8px 0;
+    }
+    .legend-box {
+        width: 25px;
+        height: 25px;
+        border: 1px solid black;
+        margin-right: 10px;
+        display: inline-block;
+    }
+    .legend-text {
+        font-size: 14px;
+    }
+    </style>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(0, 128, 0);"></span>
+        <span class="legend-text"><b>Green</b> - Start Position</span>
+    </div>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(204, 0, 0);"></span>
+        <span class="legend-text"><b>Red</b> - Target/Goal</span>
+    </div>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(0, 0, 255);"></span>
+        <span class="legend-text"><b>Blue</b> - Agent (Current Position)</span>
+    </div>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(127, 0, 127);"></span>
+        <span class="legend-text"><b>Purple</b> - Static Walls</span>
+    </div>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(153, 0, 0);"></span>
+        <span class="legend-text"><b>Dark Red</b> - Dynamic Hurdles</span>
+    </div>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(217, 235, 255);"></span>
+        <span class="legend-text"><b>Light Blue</b> - Visited Nodes (Algorithm Exploration)</span>
+    </div>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(255, 204, 0);"></span>
+        <span class="legend-text"><b>Yellow</b> - Final Path</span>
+    </div>
+    <div class="legend-item">
+        <span class="legend-box" style="background-color: rgb(255, 255, 255);"></span>
+        <span class="legend-text"><b>White</b> - Empty/Unvisited Cells</span>
+    </div>
+    """
+    
+    st.markdown(legend_html, unsafe_allow_html=True)
+    
+    st.info("💡 **Tip:** Light blue cells show how the algorithm 'thinks' - which nodes it explores before finding the path.")
+
 
 with col2:
     placeholder = st.empty()
