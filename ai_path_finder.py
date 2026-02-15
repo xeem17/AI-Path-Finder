@@ -258,20 +258,40 @@ with c1:
     
     start, target = (sx, sy), (tx, ty)
     
-    st.write("Edit Grid (Type '1' for Wall):")
-    
-    # Data editor - directly update session state from editor output
-    st.session_state.walls = st.data_editor(
-        st.session_state.walls, 
-        height=400, 
-        use_container_width=True
-    )
-    
-    # Ensure start/target are safe AFTER editor updates
+    # Ensure start/target are safe
     if st.session_state.walls[sx, sy] != 0: 
         st.session_state.walls[sx, sy] = 0
     if st.session_state.walls[tx, ty] != 0: 
         st.session_state.walls[tx, ty] = 0
+    
+    st.write("**Click cells to toggle walls:**")
+    
+    # Create clickable grid
+    for row in range(size):
+        cols = st.columns(size)
+        for col in range(size):
+            with cols[col]:
+                cell_val = st.session_state.walls[row, col]
+                is_start = (row, col) == start
+                is_target = (row, col) == target
+                
+                # Display cell status
+                if is_start:
+                    label = "🟢"
+                elif is_target:
+                    label = "🔴"
+                elif cell_val == 1:
+                    label = "⬛"
+                else:
+                    label = "⬜"
+                
+                # Toggle button
+                if st.button(label, key=f"cell_{row}_{col}", disabled=is_start or is_target):
+                    if st.session_state.walls[row, col] == 0:
+                        st.session_state.walls[row, col] = 1
+                    else:
+                        st.session_state.walls[row, col] = 0
+                    st.rerun()
 
 with c2:
     viz = st.empty()
