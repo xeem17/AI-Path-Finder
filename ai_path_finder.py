@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import collections
 import heapq
 import time
+import random
 
 # =====================================================
 # PATHFINDER CLASS
@@ -17,10 +18,16 @@ class Pathfinder:
         self.rows = len(grid)
         self.cols = len(grid[0])
 
-        # Clockwise + diagonals
+        # Strict clockwise order as per requirement:
+        # 1. Up, 2. Right, 3. Bottom, 4. Bottom-Right, 5. Left, 6. Top-Left
+        # (Excludes Top-Right and Bottom-Left diagonals)
         self.directions = [
-            (-1, 0), (-1, 1), (0, 1), (1, 1),
-            (1, 0), (1, -1), (0, -1), (-1, -1)
+            (-1, 0),   # Up
+            (0, 1),    # Right
+            (1, 0),    # Bottom
+            (1, 1),    # Bottom-Right (Diagonal)
+            (0, -1),   # Left
+            (-1, -1)   # Top-Left (Diagonal)
         ]
 
     def is_safe(self, r, c):
@@ -191,23 +198,34 @@ class Pathfinder:
 # DRAW GRID (WITH BORDERS)
 # =====================================================
 
-def draw_grid(walls, start, target, visited, path, agent, placeholder):
+def draw_grid(walls, start, target, visited, path, agent, placeholder, dynamic_obstacles=None):
     fig, ax = plt.subplots(figsize=(6, 6))
 
     rows, cols = walls.shape
     color_map = np.ones((rows, cols, 3))
 
+    # Static walls (purple)
     color_map[walls == 1] = [0.5, 0.0, 0.5]
 
+    # Dynamic obstacles (dark red)
+    if dynamic_obstacles:
+        for r, c in dynamic_obstacles:
+            color_map[r, c] = [0.6, 0.0, 0.0]
+
+    # Visited nodes (light blue)
     for r, c in visited:
         color_map[r, c] = [0.85, 0.92, 1.0]
 
+    # Path (yellow/gold)
     if path:
         for r, c in path:
             color_map[r, c] = [1.0, 0.8, 0.0]
 
+    # Start (green)
     color_map[start] = [0.0, 0.8, 0.0]
+    # Target (red)
     color_map[target] = [0.8, 0.0, 0.0]
+    # Agent (blue)
     color_map[agent] = [0.0, 0.0, 1.0]
 
     ax.imshow(color_map)
@@ -233,6 +251,7 @@ st.set_page_config(page_title="Complete Pathfinder", layout="wide")
 if "grid_size" not in st.session_state:
     st.session_state.grid_size = 10
     st.session_state.walls = np.zeros((10, 10), dtype=int)
+    st.session_state.dynamic_obstacles = set()
 
 with st.sidebar:
     st.header("Settings")
@@ -242,6 +261,7 @@ with st.sidebar:
     if size != st.session_state.grid_size:
         st.session_state.grid_size = size
         st.session_state.walls = np.zeros((size, size), dtype=int)
+        st.session_state.dynamic_obstacles = set()
 
     algo = st.selectbox("Algorithm",
                         ["BFS", "DFS", "UCS", "DLS", "IDDFS", "Bidirectional"])
@@ -252,8 +272,21 @@ with st.sidebar:
 
     speed = st.slider("Animation Speed", 0.01, 0.2, 0.05)
 
+    st.divider()
+    st.subheader("Dynamic Environment")
+    enable_dynamic = st.checkbox("Enable Dynamic Hurdles", value=True)
+    
+    if enable_dynamic:
+        dynamic_prob = st.slider("Dynamic Hurdle Probability (%)", 0, 100, 10)
+        st.info("Dynamic hurdles may appear while the agent moves. The agent will detect and re-plan.")
+    else:
+        dynamic_prob = 0
+
+    st.divider()
+
     if st.button("Clear Grid"):
         st.session_state.walls = np.zeros((size, size), dtype=int)
+        st.session_state.dynamic_obstacles = set()
         st.rerun()
 
     if st.button("Start Simulation", type="primary"):
@@ -305,11 +338,18 @@ with col1:
 
 with col2:
     placeholder = st.empty()
-    draw_grid(st.session_state.walls, start, target, [], [], start, placeholder)
+    status_placeholder = st.empty()
+    
+    draw_grid(st.session_state.walls, start, target, [], [], start, placeholder, st.session_state.dynamic_obstacles)
 
     if st.session_state.get("run", False):
-
-        pf = Pathfinder(st.session_state.walls, start, target)
+        
+        # Create a dynamic copy of the grid
+        dynamic_grid = st.session_state.walls.copy()
+        dynamic_obstacles = st.session_state.dynamic_obstacles.copy()
+        
+        # Initial pathfinding
+        pf = Pathfinder(dynamic_grid, start, target)
 
         if algo == "BFS":
             path, visited = pf.bfs()
@@ -327,10 +367,70 @@ with col2:
         if not path:
             st.error("No path found.")
         else:
-            for pos in path:
-                draw_grid(st.session_state.walls, start, target, visited, path, pos, placeholder)
+            path_index = 0
+            replans = 0
+            
+            while path_index < len(path):
+                current_pos = path[path_index]
+                
+                # Check if we need to replan due to dynamic obstacles
+                if path_index + 1 < len(path):
+                    next_pos = path[path_index + 1]
+                    
+                    # Randomly spawn dynamic hurdle with given probability
+                    if enable_dynamic and random.random() < (dynamic_prob / 100):
+                        # Find empty cells ahead in the path (not start/target/walls)
+                        potential_cells = []
+                        for i in range(path_index + 1, min(path_index + 5, len(path))):
+                            cell = path[i]
+                            if cell != start and cell != target and dynamic_grid[cell] == 0:
+                                potential_cells.append(cell)
+                        
+                        if potential_cells:
+                            obstacle_cell = random.choice(potential_cells)
+                            dynamic_obstacles.add(obstacle_cell)
+                            dynamic_grid[obstacle_cell] = 1
+                            
+                            status_placeholder.warning(f"⚠️ Dynamic hurdle detected at {obstacle_cell}! Re-planning route... (Replan #{replans + 1})")
+                            
+                            # Replan from current position
+                            pf = Pathfinder(dynamic_grid, current_pos, target)
+                            
+                            if algo == "BFS":
+                                new_path, new_visited = pf.bfs()
+                            elif algo == "DFS":
+                                new_path, new_visited = pf.dfs()
+                            elif algo == "UCS":
+                                new_path, new_visited = pf.ucs()
+                            elif algo == "DLS":
+                                new_path, new_visited = pf.dls(dls_limit)
+                            elif algo == "IDDFS":
+                                new_path, new_visited = pf.iddfs()
+                            else:
+                                new_path, new_visited = pf.bidirectional()
+                            
+                            if not new_path:
+                                st.error(f"No alternative path found after dynamic hurdle at {obstacle_cell}!")
+                                break
+                            
+                            visited = visited | new_visited
+                            path = new_path
+                            path_index = 0
+                            replans += 1
+                            time.sleep(speed * 3)  # Pause to show re-planning
+                            continue
+                
+                # Draw current state
+                draw_grid(dynamic_grid, start, target, visited, path, current_pos, placeholder, dynamic_obstacles)
                 time.sleep(speed)
+                
+                path_index += 1
 
-            st.success(f"Reached Goal in {len(path)-1} steps.")
+            if path_index >= len(path):
+                msg = f"✅ Reached Goal in {len(path)-1} steps."
+                if replans > 0:
+                    msg += f" Re-planned {replans} time(s) due to dynamic hurdles."
+                status_placeholder.success(msg)
 
         st.session_state.run = False
+        st.session_state.dynamic_obstacles = dynamic_obstacles
