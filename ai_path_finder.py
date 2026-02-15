@@ -276,13 +276,14 @@ with st.sidebar:
 
     st.divider()
     st.subheader("Dynamic Environment")
-    enable_dynamic = st.checkbox("Enable Dynamic Hurdles", value=True)
+    enable_dynamic = st.checkbox("Enable Dynamic Hurdles", value=False)
     
     if enable_dynamic:
         dynamic_prob = st.slider("Dynamic Hurdle Probability (%)", 0, 100, 10)
-        st.info("Dynamic hurdles may appear while the agent moves. The agent will detect and re-plan.")
+        st.warning("⚠️ With dynamic hurdles enabled, paths will vary each run due to random obstacles.")
     else:
         dynamic_prob = 0
+        st.success("✓ Dynamic hurdles disabled - paths will be consistent.")
 
     st.divider()
 
