@@ -1,5 +1,7 @@
 import streamlit as st
 import numpy as np
+import matplotlib
+matplotlib.use("Agg") # Prevents crashing on some systems
 import matplotlib.pyplot as plt
 import collections
 import heapq
@@ -7,7 +9,7 @@ import time
 import random
 
 # ==========================================
-# 1. LOGIC CLASS
+# 1. SIMPLIFIED PATHFINDING LOGIC
 # ==========================================
 
 class Pathfinder:
@@ -18,16 +20,17 @@ class Pathfinder:
         self.rows = len(grid)
         self.cols = len(grid[0])
         
-        # 8 Directions
+        # 8 Directions (Clockwise)
         self.directions = [
             (-1, 0), (-1, 1), (0, 1), (1, 1),
             (1, 0), (1, -1), (0, -1), (-1, -1)
         ]
 
     def is_safe(self, r, c):
+        # Check if inside the grid
         if r >= 0 and r < self.rows and c >= 0 and c < self.cols:
-            # Only '1' is a wall. Everything else is walkable.
-            if self.grid[r][c] != 1:
+            # FIX: If it is 0, it is safe. Any other number (1, 2, 3...) is a Wall.
+            if self.grid[r][c] == 0:
                 return True
         return False
 
@@ -61,6 +64,7 @@ class Pathfinder:
                 yield visited, list(queue), self.build_path(came_from, current)
                 return
             yield visited, list(queue), []
+            
             for neighbor in self.get_neighbors(current):
                 if neighbor not in visited:
                     visited.add(neighbor)
@@ -78,8 +82,9 @@ class Pathfinder:
                 yield visited, stack, self.build_path(came_from, current)
                 return
             yield visited, stack, []
+            
             neighbors = self.get_neighbors(current)
-            neighbors.reverse()
+            neighbors.reverse() # Reverse for correct clockwise order in stack
             for neighbor in neighbors:
                 if neighbor not in visited:
                     visited.add(neighbor)
@@ -99,9 +104,13 @@ class Pathfinder:
                 yield visited, [x[1] for x in pq], self.build_path(came_from, current)
                 return
             yield visited, [x[1] for x in pq], []
+            
             for neighbor in self.get_neighbors(current):
-                move_cost = 1.414 if (neighbor[0]!=current[0] and neighbor[1]!=current[1]) else 1.0
+                # Cost: 1.4 for diagonal, 1.0 for straight
+                is_diag = (neighbor[0] != current[0] and neighbor[1] != current[1])
+                move_cost = 1.414 if is_diag else 1.0
                 new_cost = cost_so_far[current] + move_cost
+                
                 if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                     cost_so_far[neighbor] = new_cost
                     heapq.heappush(pq, (new_cost, neighbor))
@@ -111,12 +120,14 @@ class Pathfinder:
         stack = [(self.start, 0)]
         came_from = {self.start: None}
         visited = {self.start}
+
         while stack:
             current, depth = stack.pop()
             if current == self.target:
                 yield visited, [x[0] for x in stack], self.build_path(came_from, current), True
                 return
             yield visited, [x[0] for x in stack], [], False
+            
             if depth < limit:
                 neighbors = self.get_neighbors(current)
                 neighbors.reverse()
@@ -124,24 +135,29 @@ class Pathfinder:
                     if neighbor not in came_from:
                         came_from[neighbor] = current
                         visited.add(neighbor)
-                        stack.append((neighbor, depth+1))
+                        stack.append((neighbor, depth + 1))
         yield visited, [], [], False
 
     def iddfs(self):
         depth = 0
-        while depth < 50:
+        while depth < 50: # Max depth safety
             for result in self.dls(depth):
                 if len(result) == 4:
-                    if result[3]: yield result[0], result[1], result[2]; return
-                else: yield result
+                    if result[3]: # Found
+                        yield result[0], result[1], result[2]
+                        return
+                else:
+                    yield result
             depth += 1
 
     def bidirectional(self):
-        q_start, q_end = collections.deque([self.start]), collections.deque([self.target])
-        v_start, v_end = {self.start:None}, {self.target:None}
+        q_start = collections.deque([self.start])
+        q_end = collections.deque([self.target])
+        v_start = {self.start: None}
+        v_end = {self.target: None}
         
         while q_start and q_end:
-            # Start Side
+            # Expand Start
             if q_start:
                 curr = q_start.popleft()
                 for n in self.get_neighbors(curr):
@@ -155,7 +171,7 @@ class Pathfinder:
                             while t: p2.append(t); t = v_end[t]
                             yield set(v_start)|set(v_end), list(q_start)+list(q_end), p1+p2
                             return
-            # End Side
+            # Expand End
             if q_end:
                 curr = q_end.popleft()
                 for n in self.get_neighbors(curr):
@@ -172,59 +188,57 @@ class Pathfinder:
             yield set(v_start)|set(v_end), list(q_start)+list(q_end), []
 
 # ==========================================
-# 2. VISUALIZATION (FIXED GRID LINES)
+# 2. VISUALIZATION
 # ==========================================
 
 def draw_grid(walls, start, end, visited, frontier, path, agent, placeholder):
-    # Make figure slightly larger
     fig, ax = plt.subplots(figsize=(6, 6))
     rows, cols = walls.shape
     
-    # Base Map (White)
+    # 1. Base Map (White)
     color_map = np.zeros((rows, cols, 3)) + 1.0 
     
-    # Walls (Purple) - Only where value is 1
-    color_map[walls == 1] = [0.5, 0.0, 0.5]
+    # 2. Walls (Purple) - FIX: Any number > 0 is a wall
+    color_map[walls > 0] = [0.5, 0.0, 0.5]
 
-    # Visited (Light Blue)
+    # 3. Visited (Light Blue)
     for r, c in visited:
         if 0 <= r < rows and 0 <= c < cols: color_map[r, c] = [0.8, 0.9, 1.0]
 
-    # Frontier (Greenish)
+    # 4. Frontier (Green)
     for r, c in frontier:
         if 0 <= r < rows and 0 <= c < cols: color_map[r, c] = [0.6, 1.0, 0.6]
 
-    # Path (Yellow)
+    # 5. Path (Yellow)
     if path:
         for r, c in path: color_map[r, c] = [1.0, 0.8, 0.0]
 
-    # Start (Green) & End (Red)
+    # 6. Start (Green) & End (Red)
     color_map[start[0], start[1]] = [0.0, 0.8, 0.0]
     color_map[end[0], end[1]] = [0.8, 0.0, 0.0]
 
-    # Agent (Blue Dot)
+    # 7. Agent (Blue)
     if agent: color_map[agent[0], agent[1]] = [0.0, 0.0, 1.0]
 
     ax.imshow(color_map)
     
-    # --- FIX: FORCE GRID LINES ---
-    # This creates the "graph paper" look
+    # Force Grid Lines (Graph Paper Look)
     ax.set_xticks(np.arange(-0.5, cols, 1))
     ax.set_yticks(np.arange(-0.5, rows, 1))
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.grid(color='black', linestyle='-', linewidth=1)
-    # -----------------------------
     
     placeholder.pyplot(fig)
     plt.close(fig)
 
 # ==========================================
-# 3. STREAMLIT APP
+# 3. APP INTERFACE
 # ==========================================
 
 st.set_page_config(page_title="Pathfinder", layout="wide")
 
+# Session State
 if 'grid_size' not in st.session_state:
     st.session_state.grid_size = 10
 if 'walls' not in st.session_state:
@@ -250,11 +264,11 @@ with st.sidebar:
         st.rerun()
     
     st.markdown("---")
-    # Use session state to trigger run
+    # Using a run flag in session state ensures smooth simulation
     if st.button("Start Simulation", type="primary"):
         st.session_state.run = True
 
-# --- MAIN PAGE ---
+# --- MAIN LAYOUT ---
 c1, c2 = st.columns([1, 1.5]) 
 
 with c1:
@@ -264,8 +278,10 @@ with c1:
     tx = col_a.number_input("Target X", 0, size-1, size-1)
     ty = col_b.number_input("Target Y", 0, size-1, size-1)
     
-    st.write("Edit Grid (Type '1' for Wall):")
+    st.write("Edit Grid (Type '1' or any number for Wall):")
     edited = st.data_editor(st.session_state.walls, height=400, use_container_width=True, key="editor")
+    
+    # Save updates from table
     if not np.array_equal(edited, st.session_state.walls):
         st.session_state.walls = edited
         st.rerun()
@@ -275,6 +291,8 @@ with c2:
     status = st.empty()
     
     start, target = (sx, sy), (tx, ty)
+    
+    # Draw Static Grid first
     draw_grid(st.session_state.walls, start, target, [], [], [], start, viz)
 
     if st.session_state.get('run', False):
@@ -310,20 +328,22 @@ with c2:
                 status.error("Stuck! No path found.")
                 break
             
-            # Move
+            # Move Agent
             if len(path) > 1: agent = path[1]; steps += 1
             
-            # Obstacle
+            # Random Obstacle
             if random.random() < prob:
                 rx, ry = random.randint(0, size-1), random.randint(0, size-1)
+                # Don't spawn on top of agent/start/target
                 if (rx, ry) not in [agent, start, target]:
-                    walls[rx, ry] = 1
-                    status.warning(f"Obstacle at {rx},{ry}")
+                    walls[rx, ry] = 1 # Mark as wall
+                    status.warning(f"Obstacle spawned at {rx},{ry}")
 
-            # Re-plan check
+            # Check Re-plan
             blocked = False
             for n in path[1:]:
-                if walls[n[0], n[1]] == 1: blocked = True; break
+                if walls[n[0], n[1]] > 0: # Check if blocked by any wall value
+                    blocked = True; break
             
             if blocked:
                 status.warning("Path blocked! Re-planning...")
