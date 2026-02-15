@@ -312,29 +312,55 @@ with c1:
     st.session_state.walls[sx, sy] = 0
     st.session_state.walls[tx, ty] = 0
     
-    st.write("**Click grid below to toggle walls:**")
-    st.write("🟩 = Start | 🟥 = Target | 🟪 = Wall | ⬜ = Empty")
+    st.write("**Edit Grid: Enter 1 for Wall, 0 for Empty**")
+    st.write("🟢 Start | 🔴 Target | 🟣 Wall | ⬜ Empty")
     
-    # Interactive Plotly grid
-    fig = draw_editor_grid(st.session_state.walls, start, target)
-    selected = st.plotly_chart(fig, key="editor", on_select="rerun", selection_mode="points")
+    # Simple data editor
+    edited_grid = st.data_editor(
+        st.session_state.walls, 
+        height=400,
+        use_container_width=True,
+        hide_index=False,
+        column_config={i: st.column_config.NumberColumn(
+            str(i),
+            help=f"Column {i}",
+            min_value=0,
+            max_value=1,
+            step=1
+        ) for i in range(size)},
+        disabled=False,
+        key=f"grid_editor_{size}"
+    )
     
-    # Handle click events
-    if selected and 'selection' in selected and 'points' in selected['selection']:
-        points = selected['selection']['points']
-        if points:
-            clicked_point = points[0]
-            if 'x' in clicked_point and 'y' in clicked_point:
-                col_clicked = clicked_point['x']
-                row_clicked = clicked_point['y']
-                
-                # Toggle wall if not start/target
-                if (row_clicked, col_clicked) != start and (row_clicked, col_clicked) != target:
-                    if st.session_state.walls[row_clicked, col_clicked] == 0:
-                        st.session_state.walls[row_clicked, col_clicked] = 1
-                    else:
-                        st.session_state.walls[row_clicked, col_clicked] = 0
-                    st.rerun()
+    # Update grid from editor
+    st.session_state.walls = edited_grid.copy()
+    
+    # Force start/target to remain empty
+    st.session_state.walls[sx, sy] = 0
+    st.session_state.walls[tx, ty] = 0
+    
+    st.write("**Quick Add Walls (Row,Col):**")
+    wall_input = st.text_input("Enter position like: 5,5", key="wall_input", placeholder="row,col")
+    col_add, col_remove = st.columns(2)
+    with col_add:
+        if st.button("Add Wall", use_container_width=True):
+            if wall_input and ',' in wall_input:
+                try:
+                    r, c = map(int, wall_input.split(','))
+                    if 0 <= r < size and 0 <= c < size:
+                        if (r, c) not in [start, target]:
+                            st.session_state.walls[r, c] = 1
+                            st.rerun()
+                except: pass
+    with col_remove:
+        if st.button("Remove Wall", use_container_width=True):
+            if wall_input and ',' in wall_input:
+                try:
+                    r, c = map(int, wall_input.split(','))
+                    if 0 <= r < size and 0 <= c < size:
+                        st.session_state.walls[r, c] = 0
+                        st.rerun()
+                except: pass
 
 with c2:
     viz = st.empty()
