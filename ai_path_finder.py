@@ -51,7 +51,7 @@ class Pathfinder:
         return path
 
     # ---------------- BFS ----------------
-    def bfs(self):
+    def bfs(self, visualize=False, callback=None):
         queue = collections.deque([self.start])
         came_from = {self.start: None}
         visited = {self.start}
@@ -66,11 +66,14 @@ class Pathfinder:
                     visited.add(neighbor)
                     came_from[neighbor] = current
                     queue.append(neighbor)
+                    
+                    if visualize and callback:
+                        callback(visited, None, current)
 
         return None, visited
 
     # ---------------- DFS ----------------
-    def dfs(self):
+    def dfs(self, visualize=False, callback=None):
         stack = [self.start]
         came_from = {self.start: None}
         visited = {self.start}
@@ -85,11 +88,14 @@ class Pathfinder:
                     visited.add(neighbor)
                     came_from[neighbor] = current
                     stack.append(neighbor)
+                    
+                    if visualize and callback:
+                        callback(visited, None, current)
 
         return None, visited
 
     # ---------------- UCS ----------------
-    def ucs(self):
+    def ucs(self, visualize=False, callback=None):
         pq = [(0, self.start)]
         came_from = {self.start: None}
         cost_so_far = {self.start: 0}
@@ -102,6 +108,9 @@ class Pathfinder:
                 continue
 
             visited.add(current)
+            
+            if visualize and callback:
+                callback(visited, None, current)
 
             if current == self.target:
                 return self.build_path(came_from, current), visited
@@ -272,7 +281,10 @@ with st.sidebar:
     if algo == "DLS":
         dls_limit = st.slider("Depth Limit", 1, 30, 10)
 
-    speed = st.slider("Animation Speed", 0.01, 0.2, 0.05)
+    speed = st.slider("Animation Speed", 0.01, 0.5, 0.1)
+    
+    show_search_animation = st.checkbox("Show Search Animation", value=False, 
+                                        help="Show step-by-step exploration (slower, better for local runs)")
 
     st.divider()
     st.subheader("Dynamic Environment")
@@ -401,10 +413,12 @@ with col1:
 with col2:
     placeholder = st.empty()
     status_placeholder = st.empty()
+    progress_placeholder = st.empty()
     
     draw_grid(st.session_state.walls, start, target, [], [], start, placeholder, st.session_state.dynamic_obstacles)
 
     if st.session_state.get("run", False):
+        progress_placeholder.info(f"🔍 Running {algo}... Exploring paths...")
         
         # Create a dynamic copy of the grid
         dynamic_grid = st.session_state.walls.copy()
@@ -413,12 +427,22 @@ with col2:
         # Initial pathfinding
         pf = Pathfinder(dynamic_grid, start, target)
 
+        # Visualization callback
+        step_counter = [0]
+        def visualize_step(vis, p, current):
+            if not show_search_animation:
+                return
+            step_counter[0] += 1
+            if step_counter[0] % max(1, (size * size) // 50) == 0:  # Show every Nth step
+                draw_grid(dynamic_grid, start, target, vis, p, current, placeholder, dynamic_obstacles)
+        
+        # Initial pathfinding with visualization
         if algo == "BFS":
-            path, visited = pf.bfs()
+            path, visited = pf.bfs(visualize=show_search_animation, callback=visualize_step)
         elif algo == "DFS":
-            path, visited = pf.dfs()
+            path, visited = pf.dfs(visualize=show_search_animation, callback=visualize_step)
         elif algo == "UCS":
-            path, visited = pf.ucs()
+            path, visited = pf.ucs(visualize=show_search_animation, callback=visualize_step)
         elif algo == "DLS":
             path, visited = pf.dls(dls_limit)
         elif algo == "IDDFS":
@@ -427,8 +451,10 @@ with col2:
             path, visited = pf.bidirectional()
 
         if not path:
+            progress_placeholder.empty()
             st.error("No path found.")
         else:
+            # Show final path with agent animation
             path_index = 0
             replans = 0
             
@@ -457,13 +483,14 @@ with col2:
                             
                             # Replan from current position
                             pf = Pathfinder(dynamic_grid, current_pos, target)
+                            step_counter[0] = 0
                             
                             if algo == "BFS":
-                                new_path, new_visited = pf.bfs()
+                                new_path, new_visited = pf.bfs(visualize=show_search_animation, callback=visualize_step)
                             elif algo == "DFS":
-                                new_path, new_visited = pf.dfs()
+                                new_path, new_visited = pf.dfs(visualize=show_search_animation, callback=visualize_step)
                             elif algo == "UCS":
-                                new_path, new_visited = pf.ucs()
+                                new_path, new_visited = pf.ucs(visualize=show_search_animation, callback=visualize_step)
                             elif algo == "DLS":
                                 new_path, new_visited = pf.dls(dls_limit)
                             elif algo == "IDDFS":
@@ -479,7 +506,6 @@ with col2:
                             path = new_path
                             path_index = 0
                             replans += 1
-                            time.sleep(speed * 3)  # Pause to show re-planning
                             continue
                 
                 # Draw current state
@@ -489,10 +515,13 @@ with col2:
                 path_index += 1
 
             if path_index >= len(path):
+                progress_placeholder.empty()
                 msg = f"✅ Reached Goal in {len(path)-1} steps."
                 if replans > 0:
                     msg += f" Re-planned {replans} time(s) due to dynamic hurdles."
                 status_placeholder.success(msg)
+                # Show final state
+                draw_grid(dynamic_grid, start, target, visited, path, target, placeholder, dynamic_obstacles)
 
         st.session_state.run = False
         st.session_state.dynamic_obstacles = dynamic_obstacles
