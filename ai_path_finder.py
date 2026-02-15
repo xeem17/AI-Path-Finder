@@ -258,23 +258,20 @@ with c1:
     
     start, target = (sx, sy), (tx, ty)
     
-    # Ensure start/target are safe
-    if st.session_state.walls[sx, sy] != 0: st.session_state.walls[sx, sy] = 0
-    if st.session_state.walls[tx, ty] != 0: st.session_state.walls[tx, ty] = 0
-    
     st.write("Edit Grid (Type '1' for Wall):")
     
-    # Data editor - key handles state automatically
-    edited_walls = st.data_editor(
+    # Data editor - directly update session state from editor output
+    st.session_state.walls = st.data_editor(
         st.session_state.walls, 
         height=400, 
-        use_container_width=True, 
-        key="editor"
+        use_container_width=True
     )
     
-    # Only update if there are actual changes
-    if not np.array_equal(edited_walls, st.session_state.walls):
-        st.session_state.walls = edited_walls
+    # Ensure start/target are safe AFTER editor updates
+    if st.session_state.walls[sx, sy] != 0: 
+        st.session_state.walls[sx, sy] = 0
+    if st.session_state.walls[tx, ty] != 0: 
+        st.session_state.walls[tx, ty] = 0
 
 with c2:
     viz = st.empty()
