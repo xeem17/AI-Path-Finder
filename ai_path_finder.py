@@ -327,28 +327,59 @@ with col1:
     st.divider()
     st.subheader("Wall Editor")
 
-    wall_input = st.text_input("Enter wall coordinate (row,col)")
+    wall_input = st.text_input("Enter wall coordinate (row,col)", placeholder="e.g., 3,5")
 
     colA, colB = st.columns(2)
 
     with colA:
         if st.button("Add Wall"):
-            try:
-                r, c = map(int, wall_input.split(","))
-                if (r, c) != start and (r, c) != target:
-                    st.session_state.walls[r, c] = 1
-                    st.rerun()
-            except:
-                st.error("Invalid format")
+            if wall_input.strip():
+                try:
+                    # Remove all whitespace and split
+                    parts = wall_input.replace(" ", "").split(",")
+                    if len(parts) != 2:
+                        st.error("Invalid format. Use: row,col (e.g., 3,5)")
+                    else:
+                        r, c = int(parts[0]), int(parts[1])
+                        
+                        # Check if within bounds
+                        if r < 0 or r >= size or c < 0 or c >= size:
+                            st.error(f"Out of bounds! Use values 0-{size-1}")
+                        elif (r, c) == start:
+                            st.warning("Cannot place wall on start position")
+                        elif (r, c) == target:
+                            st.warning("Cannot place wall on target position")
+                        else:
+                            st.session_state.walls[r, c] = 1
+                            st.success(f"Wall added at ({r},{c})")
+                            st.rerun()
+                except ValueError:
+                    st.error("Invalid format. Use numbers only (e.g., 3,5)")
+            else:
+                st.error("Please enter coordinates (e.g., 3,5)")
 
     with colB:
         if st.button("Remove Wall"):
-            try:
-                r, c = map(int, wall_input.split(","))
-                st.session_state.walls[r, c] = 0
-                st.rerun()
-            except:
-                st.error("Invalid format")
+            if wall_input.strip():
+                try:
+                    # Remove all whitespace and split
+                    parts = wall_input.replace(" ", "").split(",")
+                    if len(parts) != 2:
+                        st.error("Invalid format. Use: row,col (e.g., 3,5)")
+                    else:
+                        r, c = int(parts[0]), int(parts[1])
+                        
+                        # Check if within bounds
+                        if r < 0 or r >= size or c < 0 or c >= size:
+                            st.error(f"Out of bounds! Use values 0-{size-1}")
+                        else:
+                            st.session_state.walls[r, c] = 0
+                            st.success(f"Wall removed at ({r},{c})")
+                            st.rerun()
+                except ValueError:
+                    st.error("Invalid format. Use numbers only (e.g., 3,5)")
+            else:
+                st.error("Please enter coordinates (e.g., 3,5)")
 
     st.divider()
     st.subheader("Legend")
