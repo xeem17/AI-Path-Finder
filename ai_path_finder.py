@@ -320,34 +320,41 @@ with c1:
     col_add, col_remove = st.columns(2)
     with col_add:
         if st.button("Add Wall", use_container_width=True, type="primary"):
-            if wall_input and ',' in wall_input:
+            if not wall_input or ',' not in wall_input:
+                st.error("Invalid format! Use: row,col (Example: 5,5)")
+            else:
                 try:
-                    r, c = map(int, wall_input.split(','))
-                    if 0 <= r < size and 0 <= c < size:
-                        if (r, c) not in [start, target]:
-                            st.session_state.walls[r, c] = 1
-                            st.success(f"Wall added at ({r},{c})")
-                            st.rerun()
-                        else:
-                            st.warning("Cannot place wall on start/target!")
+                    parts = wall_input.strip().split(',')
+                    r, c = int(parts[0]), int(parts[1])
+                    
+                    if r < 0 or r >= size or c < 0 or c >= size:
+                        st.error(f"Position out of bounds! Use 0-{size-1}")
+                    elif (r, c) == start or (r, c) == target:
+                        st.warning("Cannot place wall on start/target!")
                     else:
-                        st.error("Position out of grid bounds!")
-                except:
-                    st.error("Invalid format! Use: row,col")
+                        st.session_state.walls[r, c] = 1
+                        st.success(f"✓ Wall added at ({r},{c})")
+                        st.rerun()
+                except (ValueError, IndexError):
+                    st.error("Invalid format! Use numbers only: row,col")
     
     with col_remove:
         if st.button("Remove Wall", use_container_width=True):
-            if wall_input and ',' in wall_input:
+            if not wall_input or ',' not in wall_input:
+                st.error("Invalid format! Use: row,col (Example: 5,5)")
+            else:
                 try:
-                    r, c = map(int, wall_input.split(','))
-                    if 0 <= r < size and 0 <= c < size:
-                        st.session_state.walls[r, c] = 0
-                        st.success(f"Wall removed at ({r},{c})")
-                        st.rerun()
+                    parts = wall_input.strip().split(',')
+                    r, c = int(parts[0]), int(parts[1])
+                    
+                    if r < 0 or r >= size or c < 0 or c >= size:
+                        st.error(f"Position out of bounds! Use 0-{size-1}")
                     else:
-                        st.error("Position out of grid bounds!")
-                except:
-                    st.error("Invalid format! Use: row,col")
+                        st.session_state.walls[r, c] = 0
+                        st.success(f"✓ Wall removed at ({r},{c})")
+                        st.rerun()
+                except (ValueError, IndexError):
+                    st.error("Invalid format! Use numbers only: row,col")
     
     st.divider()
     
