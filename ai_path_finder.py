@@ -251,6 +251,8 @@ st.set_page_config(page_title="Complete Pathfinder", layout="wide")
 if "grid_size" not in st.session_state:
     st.session_state.grid_size = 10
     st.session_state.walls = np.zeros((10, 10), dtype=int)
+
+if "dynamic_obstacles" not in st.session_state:
     st.session_state.dynamic_obstacles = set()
 
 with st.sidebar:
