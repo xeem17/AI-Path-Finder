@@ -275,15 +275,16 @@ with c1:
                 is_start = (row, col) == start
                 is_target = (row, col) == target
                 
-                # Display cell status
+                # Display cell status with coordinates
+                coord = f"{row},{col}"
                 if is_start:
-                    label = "🟢"
+                    label = f"🟢\n{coord}"
                 elif is_target:
-                    label = "🔴"
+                    label = f"🔴\n{coord}"
                 elif cell_val == 1:
-                    label = "⬛"
+                    label = f"⬛\n{coord}"
                 else:
-                    label = "⬜"
+                    label = f"⬜\n{coord}"
                 
                 # Toggle button
                 if st.button(label, key=f"cell_{row}_{col}", disabled=is_start or is_target):
