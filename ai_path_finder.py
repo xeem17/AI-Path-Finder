@@ -312,46 +312,29 @@ with c1:
     st.session_state.walls[sx, sy] = 0
     st.session_state.walls[tx, ty] = 0
     
-    st.write("**Edit Grid: Enter 1 for Wall, 0 for Empty**")
+    st.write("**Add/Remove Walls:**")
     st.write("🟢 Start | 🔴 Target | 🟣 Wall | ⬜ Empty")
     
-    # Simple data editor
-    edited_grid = st.data_editor(
-        st.session_state.walls, 
-        height=400,
-        use_container_width=True,
-        hide_index=False,
-        column_config={i: st.column_config.NumberColumn(
-            str(i),
-            help=f"Column {i}",
-            min_value=0,
-            max_value=1,
-            step=1
-        ) for i in range(size)},
-        disabled=False,
-        key=f"grid_editor_{size}"
-    )
+    wall_input = st.text_input("Enter position (row,col):", key="wall_input", placeholder="Example: 5,5")
     
-    # Update grid from editor
-    st.session_state.walls = edited_grid.copy()
-    
-    # Force start/target to remain empty
-    st.session_state.walls[sx, sy] = 0
-    st.session_state.walls[tx, ty] = 0
-    
-    st.write("**Quick Add Walls (Row,Col):**")
-    wall_input = st.text_input("Enter position like: 5,5", key="wall_input", placeholder="row,col")
     col_add, col_remove = st.columns(2)
     with col_add:
-        if st.button("Add Wall", use_container_width=True):
+        if st.button("Add Wall", use_container_width=True, type="primary"):
             if wall_input and ',' in wall_input:
                 try:
                     r, c = map(int, wall_input.split(','))
                     if 0 <= r < size and 0 <= c < size:
                         if (r, c) not in [start, target]:
                             st.session_state.walls[r, c] = 1
+                            st.success(f"Wall added at ({r},{c})")
                             st.rerun()
-                except: pass
+                        else:
+                            st.warning("Cannot place wall on start/target!")
+                    else:
+                        st.error("Position out of grid bounds!")
+                except:
+                    st.error("Invalid format! Use: row,col")
+    
     with col_remove:
         if st.button("Remove Wall", use_container_width=True):
             if wall_input and ',' in wall_input:
@@ -359,8 +342,29 @@ with c1:
                     r, c = map(int, wall_input.split(','))
                     if 0 <= r < size and 0 <= c < size:
                         st.session_state.walls[r, c] = 0
+                        st.success(f"Wall removed at ({r},{c})")
                         st.rerun()
-                except: pass
+                    else:
+                        st.error("Position out of grid bounds!")
+                except:
+                    st.error("Invalid format! Use: row,col")
+    
+    st.divider()
+    
+    # Display current walls
+    wall_positions = []
+    for r in range(size):
+        for c in range(size):
+            if st.session_state.walls[r, c] == 1:
+                wall_positions.append(f"({r},{c})")
+    
+    if wall_positions:
+        st.write(f"**Current Walls ({len(wall_positions)}):**")
+        st.text(", ".join(wall_positions[:20]))  # Show first 20
+        if len(wall_positions) > 20:
+            st.text(f"... and {len(wall_positions) - 20} more")
+    else:
+        st.info("No walls placed yet")
 
 with c2:
     viz = st.empty()
