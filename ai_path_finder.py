@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg") # Optimizes plotting for web apps
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 import collections
 import heapq
 import time
@@ -204,6 +205,55 @@ def draw_grid(walls, start, end, visited, frontier, path, agent, placeholder):
     placeholder.pyplot(fig)
     plt.close(fig)
 
+def draw_editor_grid(walls, start, target):
+    """Create interactive Plotly grid for editing walls"""
+    rows, cols = walls.shape
+    
+    # Create display grid with text annotations
+    display = np.zeros((rows, cols))
+    text = [['' for _ in range(cols)] for _ in range(rows)]
+    
+    for r in range(rows):
+        for c in range(cols):
+            if (r, c) == start:
+                display[r, c] = 2
+                text[r][c] = f'START<br>{r},{c}'
+            elif (r, c) == target:
+                display[r, c] = 3
+                text[r][c] = f'TARGET<br>{r},{c}'
+            elif walls[r, c] == 1:
+                display[r, c] = 1
+                text[r][c] = f'WALL<br>{r},{c}'
+            else:
+                display[r, c] = 0
+                text[r][c] = f'{r},{c}'
+    
+    # Create heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=display,
+        text=text,
+        texttemplate='%{text}',
+        textfont={"size": 10},
+        colorscale=[
+            [0, 'white'],      # Empty
+            [0.33, 'purple'],  # Wall
+            [0.66, 'green'],   # Start
+            [1, 'red']         # Target
+        ],
+        showscale=False,
+        hovertemplate='Row: %{y}<br>Col: %{x}<br>Click to toggle<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        width=500,
+        height=500,
+        xaxis=dict(side='top', dtick=1, showgrid=True, gridcolor='black'),
+        yaxis=dict(dtick=1, showgrid=True, gridcolor='black', autorange='reversed'),
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+    
+    return fig
+
 # ==========================================
 # 3. STREAMLIT APP
 # ==========================================
@@ -251,47 +301,39 @@ c1, c2 = st.columns([1, 1.5])
 
 with c1:
     col_a, col_b = st.columns(2)
-    sx = col_a.number_input("Start X", 0, size-1, 0)
-    sy = col_b.number_input("Start Y", 0, size-1, 0)
-    tx = col_a.number_input("Target X", 0, size-1, size-1)
-    ty = col_b.number_input("Target Y", 0, size-1, size-1)
+    sx = col_a.number_input("Start X", 0, size-1, 0, key="start_x")
+    sy = col_b.number_input("Start Y", 0, size-1, 0, key="start_y")
+    tx = col_a.number_input("Target X", 0, size-1, size-1, key="target_x")
+    ty = col_b.number_input("Target Y", 0, size-1, size-1, key="target_y")
     
     start, target = (sx, sy), (tx, ty)
     
     # Ensure start/target are safe
-    if st.session_state.walls[sx, sy] != 0: 
-        st.session_state.walls[sx, sy] = 0
-    if st.session_state.walls[tx, ty] != 0: 
-        st.session_state.walls[tx, ty] = 0
+    st.session_state.walls[sx, sy] = 0
+    st.session_state.walls[tx, ty] = 0
     
-    st.write("**Click cells to toggle walls:**")
+    st.write("**Click grid below to toggle walls:**")
+    st.write("🟩 = Start | 🟥 = Target | 🟪 = Wall | ⬜ = Empty")
     
-    # Create clickable grid
-    for row in range(size):
-        cols = st.columns(size)
-        for col in range(size):
-            with cols[col]:
-                cell_val = st.session_state.walls[row, col]
-                is_start = (row, col) == start
-                is_target = (row, col) == target
+    # Interactive Plotly grid
+    fig = draw_editor_grid(st.session_state.walls, start, target)
+    selected = st.plotly_chart(fig, key="editor", on_select="rerun", selection_mode="points")
+    
+    # Handle click events
+    if selected and 'selection' in selected and 'points' in selected['selection']:
+        points = selected['selection']['points']
+        if points:
+            clicked_point = points[0]
+            if 'x' in clicked_point and 'y' in clicked_point:
+                col_clicked = clicked_point['x']
+                row_clicked = clicked_point['y']
                 
-                # Display cell status with coordinates
-                coord = f"{row},{col}"
-                if is_start:
-                    label = f"🟢\n{coord}"
-                elif is_target:
-                    label = f"🔴\n{coord}"
-                elif cell_val == 1:
-                    label = f"⬛\n{coord}"
-                else:
-                    label = f"⬜\n{coord}"
-                
-                # Toggle button
-                if st.button(label, key=f"cell_{row}_{col}", disabled=is_start or is_target):
-                    if st.session_state.walls[row, col] == 0:
-                        st.session_state.walls[row, col] = 1
+                # Toggle wall if not start/target
+                if (row_clicked, col_clicked) != start and (row_clicked, col_clicked) != target:
+                    if st.session_state.walls[row_clicked, col_clicked] == 0:
+                        st.session_state.walls[row_clicked, col_clicked] = 1
                     else:
-                        st.session_state.walls[row, col] = 0
+                        st.session_state.walls[row_clicked, col_clicked] = 0
                     st.rerun()
 
 with c2:
