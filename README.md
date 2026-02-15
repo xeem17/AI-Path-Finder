@@ -106,31 +106,7 @@ python pygame_gui.py
 
 This GUI supports similar interactive features with real-time visualization.
 
-6. Repository Structure
-AI-Pathfinder/
-│
-├── pathfinder.py        # Core pathfinding algorithms
-├── gui.py               # Streamlit interactive GUI
-├── pygame_gui.py        # Optional Pygame GUI
-├── requirements.txt     # Project dependencies
-└── README.md            # Project documentation
-
-7. Example Output (Command-Line)
-============================================================
-AI PATHFINDER - Testing All Algorithms
-============================================================
-
-Running BFS...
-✓ Path found! Length: 25, Nodes explored: 110
-
-Running DFS...
-✓ Path found! Length: 28, Nodes explored: 95
-
-Running UCS...
-✓ Path found! Length: 25, Nodes explored: 105
-  Path cost: 26.24
-
-8. Notes and Recommendations
+7. Notes and Recommendations
 
 Diagonal movement is supported by default.
 
