@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import matplotlib
-matplotlib.use("Agg") # Prevent GUI threading errors
+matplotlib.use("Agg") # Optimizes plotting for web apps
 import matplotlib.pyplot as plt
 import collections
 import heapq
@@ -28,7 +28,7 @@ class Pathfinder:
 
     def is_safe(self, r, c):
         if r >= 0 and r < self.rows and c >= 0 and c < self.cols:
-            # 0 is safe. Anything else (1, 2, etc.) is a wall.
+            # 0 is empty/safe. Any other number is a wall.
             if self.grid[r][c] == 0:
                 return True
         return False
@@ -50,7 +50,7 @@ class Pathfinder:
         path.reverse()
         return path
 
-    # --- SEARCH ALGORITHMS ---
+    # --- ALGORITHMS ---
 
     def bfs(self):
         queue = collections.deque([self.start])
@@ -63,7 +63,6 @@ class Pathfinder:
                 yield visited, list(queue), self.build_path(came_from, current)
                 return
             yield visited, list(queue), []
-            
             for neighbor in self.get_neighbors(current):
                 if neighbor not in visited:
                     visited.add(neighbor)
@@ -81,9 +80,8 @@ class Pathfinder:
                 yield visited, stack, self.build_path(came_from, current)
                 return
             yield visited, stack, []
-            
             neighbors = self.get_neighbors(current)
-            neighbors.reverse() 
+            neighbors.reverse()
             for neighbor in neighbors:
                 if neighbor not in visited:
                     visited.add(neighbor)
@@ -103,7 +101,6 @@ class Pathfinder:
                 yield visited, [x[1] for x in pq], self.build_path(came_from, current)
                 return
             yield visited, [x[1] for x in pq], []
-            
             for neighbor in self.get_neighbors(current):
                 move_cost = 1.414 if (neighbor[0]!=current[0] and neighbor[1]!=current[1]) else 1.0
                 new_cost = cost_so_far[current] + move_cost
@@ -116,14 +113,12 @@ class Pathfinder:
         stack = [(self.start, 0)]
         came_from = {self.start: None}
         visited = {self.start}
-
         while stack:
             current, depth = stack.pop()
             if current == self.target:
                 yield visited, [x[0] for x in stack], self.build_path(came_from, current), True
                 return
             yield visited, [x[0] for x in stack], [], False
-            
             if depth < limit:
                 neighbors = self.get_neighbors(current)
                 neighbors.reverse()
@@ -144,13 +139,9 @@ class Pathfinder:
             depth += 1
 
     def bidirectional(self):
-        q_start = collections.deque([self.start])
-        q_end = collections.deque([self.target])
-        v_start = {self.start: None}
-        v_end = {self.target: None}
-        
+        q_start, q_end = collections.deque([self.start]), collections.deque([self.target])
+        v_start, v_end = {self.start:None}, {self.target:None}
         while q_start and q_end:
-            # Start Side
             if q_start:
                 curr = q_start.popleft()
                 for n in self.get_neighbors(curr):
@@ -164,7 +155,6 @@ class Pathfinder:
                             while t: p2.append(t); t = v_end[t]
                             yield set(v_start)|set(v_end), list(q_start)+list(q_end), p1+p2
                             return
-            # End Side
             if q_end:
                 curr = q_end.popleft()
                 for n in self.get_neighbors(curr):
@@ -188,34 +178,23 @@ def draw_grid(walls, start, end, visited, frontier, path, agent, placeholder):
     fig, ax = plt.subplots(figsize=(6, 6))
     rows, cols = walls.shape
     
-    # 1. Base Map (White)
     color_map = np.zeros((rows, cols, 3)) + 1.0 
+    color_map[walls > 0] = [0.5, 0.0, 0.5] # Purple Walls
     
-    # 2. Walls (Purple) - Any number > 0 is wall
-    color_map[walls > 0] = [0.5, 0.0, 0.5]
-
-    # 3. Visited (Light Blue)
     for r, c in visited:
-        if 0 <= r < rows and 0 <= c < cols: color_map[r, c] = [0.8, 0.9, 1.0]
-
-    # 4. Frontier (Green)
+        if 0 <= r < rows and 0 <= c < cols: color_map[r, c] = [0.8, 0.9, 1.0] # Blue Visited
     for r, c in frontier:
-        if 0 <= r < rows and 0 <= c < cols: color_map[r, c] = [0.6, 1.0, 0.6]
-
-    # 5. Path (Yellow)
+        if 0 <= r < rows and 0 <= c < cols: color_map[r, c] = [0.6, 1.0, 0.6] # Green Frontier
     if path:
-        for r, c in path: color_map[r, c] = [1.0, 0.8, 0.0]
+        for r, c in path: color_map[r, c] = [1.0, 0.8, 0.0] # Yellow Path
 
-    # 6. Start (Green) & End (Red)
-    color_map[start[0], start[1]] = [0.0, 0.8, 0.0]
-    color_map[end[0], end[1]] = [0.8, 0.0, 0.0]
-
-    # 7. Agent (Blue)
-    if agent: color_map[agent[0], agent[1]] = [0.0, 0.0, 1.0]
+    color_map[start[0], start[1]] = [0.0, 0.8, 0.0] # Green Start
+    color_map[end[0], end[1]] = [0.8, 0.0, 0.0]     # Red Target
+    if agent: color_map[agent[0], agent[1]] = [0.0, 0.0, 1.0] # Blue Agent
 
     ax.imshow(color_map)
     
-    # Grid Lines
+    # Force Grid Lines
     ax.set_xticks(np.arange(-0.5, cols, 1))
     ax.set_yticks(np.arange(-0.5, rows, 1))
     ax.set_xticklabels([])
@@ -231,7 +210,6 @@ def draw_grid(walls, start, end, visited, frontier, path, agent, placeholder):
 
 st.set_page_config(page_title="Pathfinder", layout="wide")
 
-# Session State
 if 'grid_size' not in st.session_state:
     st.session_state.grid_size = 10
 if 'walls' not in st.session_state:
@@ -242,7 +220,6 @@ with st.sidebar:
     st.header("Configuration")
     size = st.slider("Grid Size", 5, 25, 10)
     
-    # Reset grid if size changes
     if size != st.session_state.grid_size:
         st.session_state.grid_size = size
         st.session_state.walls = np.zeros((size, size), dtype=int)
@@ -252,22 +229,16 @@ with st.sidebar:
     speed = st.slider("Animation Speed", 0.01, 0.5, 0.05)
     
     st.subheader("Map Controls")
-    
-    # --- NEW: Randomize Button ---
-    col_rand, col_reset = st.columns(2)
-    with col_rand:
+    c_rand, c_clear = st.columns(2)
+    with c_rand:
         if st.button("Randomize"):
-            # Create random walls (approx 30% coverage)
-            # Use random.choice([0, 0, 1]) to weight towards empty space
-            new_walls = np.random.choice([0, 0, 0, 1], size=(size, size))
-            st.session_state.walls = new_walls
+            st.session_state.walls = np.random.choice([0, 0, 0, 1], size=(size, size))
             st.rerun()
-            
-    with col_reset:
-        if st.button("Reset Grid"):
+    with c_clear:
+        if st.button("Clear Grid"):
             st.session_state.walls = np.zeros((size, size), dtype=int)
             st.rerun()
-    
+            
     st.subheader("Dynamic Obstacles")
     prob = st.slider("Spawn Probability", 0.0, 0.5, 0.10)
     
@@ -286,18 +257,20 @@ with c1:
     ty = col_b.number_input("Target Y", 0, size-1, size-1)
     
     start, target = (sx, sy), (tx, ty)
-
-    # Ensure Start and Target are never walls when randomizing
+    
+    # Ensure start/target are safe
     if st.session_state.walls[sx, sy] != 0: st.session_state.walls[sx, sy] = 0
     if st.session_state.walls[tx, ty] != 0: st.session_state.walls[tx, ty] = 0
     
     st.write("Edit Grid (Type '1' for Wall):")
-    edited = st.data_editor(st.session_state.walls, height=400, use_container_width=True, key="editor")
     
-    # Save updates from table
-    if not np.array_equal(edited, st.session_state.walls):
-        st.session_state.walls = edited
-        st.rerun()
+    # FIX: Assign directly to session state. NO manual rerun check here.
+    st.session_state.walls = st.data_editor(
+        st.session_state.walls, 
+        height=400, 
+        use_container_width=True, 
+        key="editor"
+    )
 
 with c2:
     viz = st.empty()
@@ -314,7 +287,6 @@ with c2:
         while agent != target:
             pf = Pathfinder(walls, agent, target)
             
-            # Select Algo
             if algo == "BFS": gen = pf.bfs()
             elif algo == "DFS": gen = pf.dfs()
             elif algo == "UCS": gen = pf.ucs()
@@ -327,7 +299,6 @@ with c2:
                         else: yield i
                 gen = wrap()
 
-            # Animate Plan
             path = []
             visited = set()
             for step in gen:
@@ -339,22 +310,17 @@ with c2:
                 status.error("Stuck! No path found.")
                 break
             
-            # Move Agent
             if len(path) > 1: agent = path[1]; steps += 1
             
-            # Random Obstacle
             if random.random() < prob:
                 rx, ry = random.randint(0, size-1), random.randint(0, size-1)
-                # Don't spawn on top of agent/start/target
                 if (rx, ry) not in [agent, start, target]:
-                    walls[rx, ry] = 1 # Mark as wall
+                    walls[rx, ry] = 1
                     status.warning(f"Obstacle spawned at {rx},{ry}")
 
-            # Check Re-plan
             blocked = False
             for n in path[1:]:
-                if walls[n[0], n[1]] > 0: # Check if blocked by any wall value
-                    blocked = True; break
+                if walls[n[0], n[1]] > 0: blocked = True; break
             
             if blocked:
                 status.warning("Path blocked! Re-planning...")
