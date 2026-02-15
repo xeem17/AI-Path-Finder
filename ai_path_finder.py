@@ -1,7 +1,7 @@
 import streamlit as st
 import numpy as np
 import matplotlib
-matplotlib.use("Agg") # Prevents crashing on some systems
+matplotlib.use("Agg") # Prevent GUI threading errors
 import matplotlib.pyplot as plt
 import collections
 import heapq
@@ -9,7 +9,7 @@ import time
 import random
 
 # ==========================================
-# 1. SIMPLIFIED PATHFINDING LOGIC
+# 1. PATHFINDING LOGIC
 # ==========================================
 
 class Pathfinder:
@@ -27,9 +27,8 @@ class Pathfinder:
         ]
 
     def is_safe(self, r, c):
-        # Check if inside the grid
         if r >= 0 and r < self.rows and c >= 0 and c < self.cols:
-            # FIX: If it is 0, it is safe. Any other number (1, 2, 3...) is a Wall.
+            # 0 is safe. Anything else (1, 2, etc.) is a wall.
             if self.grid[r][c] == 0:
                 return True
         return False
@@ -51,7 +50,7 @@ class Pathfinder:
         path.reverse()
         return path
 
-    # --- ALGORITHMS ---
+    # --- SEARCH ALGORITHMS ---
 
     def bfs(self):
         queue = collections.deque([self.start])
@@ -84,7 +83,7 @@ class Pathfinder:
             yield visited, stack, []
             
             neighbors = self.get_neighbors(current)
-            neighbors.reverse() # Reverse for correct clockwise order in stack
+            neighbors.reverse() 
             for neighbor in neighbors:
                 if neighbor not in visited:
                     visited.add(neighbor)
@@ -106,11 +105,8 @@ class Pathfinder:
             yield visited, [x[1] for x in pq], []
             
             for neighbor in self.get_neighbors(current):
-                # Cost: 1.4 for diagonal, 1.0 for straight
-                is_diag = (neighbor[0] != current[0] and neighbor[1] != current[1])
-                move_cost = 1.414 if is_diag else 1.0
+                move_cost = 1.414 if (neighbor[0]!=current[0] and neighbor[1]!=current[1]) else 1.0
                 new_cost = cost_so_far[current] + move_cost
-                
                 if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                     cost_so_far[neighbor] = new_cost
                     heapq.heappush(pq, (new_cost, neighbor))
@@ -135,19 +131,16 @@ class Pathfinder:
                     if neighbor not in came_from:
                         came_from[neighbor] = current
                         visited.add(neighbor)
-                        stack.append((neighbor, depth + 1))
+                        stack.append((neighbor, depth+1))
         yield visited, [], [], False
 
     def iddfs(self):
         depth = 0
-        while depth < 50: # Max depth safety
+        while depth < 50:
             for result in self.dls(depth):
                 if len(result) == 4:
-                    if result[3]: # Found
-                        yield result[0], result[1], result[2]
-                        return
-                else:
-                    yield result
+                    if result[3]: yield result[0], result[1], result[2]; return
+                else: yield result
             depth += 1
 
     def bidirectional(self):
@@ -157,7 +150,7 @@ class Pathfinder:
         v_end = {self.target: None}
         
         while q_start and q_end:
-            # Expand Start
+            # Start Side
             if q_start:
                 curr = q_start.popleft()
                 for n in self.get_neighbors(curr):
@@ -171,7 +164,7 @@ class Pathfinder:
                             while t: p2.append(t); t = v_end[t]
                             yield set(v_start)|set(v_end), list(q_start)+list(q_end), p1+p2
                             return
-            # Expand End
+            # End Side
             if q_end:
                 curr = q_end.popleft()
                 for n in self.get_neighbors(curr):
@@ -198,7 +191,7 @@ def draw_grid(walls, start, end, visited, frontier, path, agent, placeholder):
     # 1. Base Map (White)
     color_map = np.zeros((rows, cols, 3)) + 1.0 
     
-    # 2. Walls (Purple) - FIX: Any number > 0 is a wall
+    # 2. Walls (Purple) - Any number > 0 is wall
     color_map[walls > 0] = [0.5, 0.0, 0.5]
 
     # 3. Visited (Light Blue)
@@ -222,7 +215,7 @@ def draw_grid(walls, start, end, visited, frontier, path, agent, placeholder):
 
     ax.imshow(color_map)
     
-    # Force Grid Lines (Graph Paper Look)
+    # Grid Lines
     ax.set_xticks(np.arange(-0.5, cols, 1))
     ax.set_yticks(np.arange(-0.5, rows, 1))
     ax.set_xticklabels([])
@@ -233,7 +226,7 @@ def draw_grid(walls, start, end, visited, frontier, path, agent, placeholder):
     plt.close(fig)
 
 # ==========================================
-# 3. APP INTERFACE
+# 3. STREAMLIT APP
 # ==========================================
 
 st.set_page_config(page_title="Pathfinder", layout="wide")
@@ -248,6 +241,8 @@ if 'walls' not in st.session_state:
 with st.sidebar:
     st.header("Configuration")
     size = st.slider("Grid Size", 5, 25, 10)
+    
+    # Reset grid if size changes
     if size != st.session_state.grid_size:
         st.session_state.grid_size = size
         st.session_state.walls = np.zeros((size, size), dtype=int)
@@ -256,15 +251,27 @@ with st.sidebar:
     dls_lim = st.slider("DLS Limit", 1, 30, 10) if algo == "DLS" else 10
     speed = st.slider("Animation Speed", 0.01, 0.5, 0.05)
     
+    st.subheader("Map Controls")
+    
+    # --- NEW: Randomize Button ---
+    col_rand, col_reset = st.columns(2)
+    with col_rand:
+        if st.button("Randomize"):
+            # Create random walls (approx 30% coverage)
+            # Use random.choice([0, 0, 1]) to weight towards empty space
+            new_walls = np.random.choice([0, 0, 0, 1], size=(size, size))
+            st.session_state.walls = new_walls
+            st.rerun()
+            
+    with col_reset:
+        if st.button("Reset Grid"):
+            st.session_state.walls = np.zeros((size, size), dtype=int)
+            st.rerun()
+    
     st.subheader("Dynamic Obstacles")
     prob = st.slider("Spawn Probability", 0.0, 0.5, 0.10)
-
-    if st.button("Reset Grid"):
-        st.session_state.walls = np.zeros((size, size), dtype=int)
-        st.rerun()
     
     st.markdown("---")
-    # Using a run flag in session state ensures smooth simulation
     if st.button("Start Simulation", type="primary"):
         st.session_state.run = True
 
@@ -278,7 +285,13 @@ with c1:
     tx = col_a.number_input("Target X", 0, size-1, size-1)
     ty = col_b.number_input("Target Y", 0, size-1, size-1)
     
-    st.write("Edit Grid (Type '1' or any number for Wall):")
+    start, target = (sx, sy), (tx, ty)
+
+    # Ensure Start and Target are never walls when randomizing
+    if st.session_state.walls[sx, sy] != 0: st.session_state.walls[sx, sy] = 0
+    if st.session_state.walls[tx, ty] != 0: st.session_state.walls[tx, ty] = 0
+    
+    st.write("Edit Grid (Type '1' for Wall):")
     edited = st.data_editor(st.session_state.walls, height=400, use_container_width=True, key="editor")
     
     # Save updates from table
@@ -290,9 +303,7 @@ with c2:
     viz = st.empty()
     status = st.empty()
     
-    start, target = (sx, sy), (tx, ty)
-    
-    # Draw Static Grid first
+    # Draw Static Grid
     draw_grid(st.session_state.walls, start, target, [], [], [], start, viz)
 
     if st.session_state.get('run', False):
