@@ -264,13 +264,17 @@ with c1:
     
     st.write("Edit Grid (Type '1' for Wall):")
     
-    # FIX: Assign directly to session state. NO manual rerun check here.
-    st.session_state.walls = st.data_editor(
+    # Data editor - key handles state automatically
+    edited_walls = st.data_editor(
         st.session_state.walls, 
         height=400, 
         use_container_width=True, 
         key="editor"
     )
+    
+    # Only update if there are actual changes
+    if not np.array_equal(edited_walls, st.session_state.walls):
+        st.session_state.walls = edited_walls
 
 with c2:
     viz = st.empty()
