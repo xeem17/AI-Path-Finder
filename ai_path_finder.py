@@ -17,6 +17,7 @@ class Pathfinder:
         self.rows = len(grid)
         self.cols = len(grid[0])
 
+        # Clockwise + diagonals
         self.directions = [
             (-1, 0), (-1, 1), (0, 1), (1, 1),
             (1, 0), (1, -1), (0, -1), (-1, -1)
@@ -89,6 +90,7 @@ class Pathfinder:
 
         while pq:
             cost, current = heapq.heappop(pq)
+
             if current in visited:
                 continue
 
@@ -161,7 +163,7 @@ class Pathfinder:
                     q_start.append(neighbor)
 
                     if neighbor in visited_end:
-                        return self.merge_paths(parent_start, parent_end, neighbor), visited_start | visited_end
+                        return self.merge(parent_start, parent_end, neighbor), visited_start | visited_end
 
             current = q_end.popleft()
             for neighbor in self.get_neighbors(current):
@@ -171,22 +173,22 @@ class Pathfinder:
                     q_end.append(neighbor)
 
                     if neighbor in visited_start:
-                        return self.merge_paths(parent_start, parent_end, neighbor), visited_start | visited_end
+                        return self.merge(parent_start, parent_end, neighbor), visited_start | visited_end
 
         return None, visited_start | visited_end
 
-    def merge_paths(self, p_start, p_end, meet):
-        path1 = self.build_path(p_start, meet)
+    def merge(self, p1, p2, meet):
+        path1 = self.build_path(p1, meet)
         path2 = []
-        node = p_end[meet]
+        node = p2[meet]
         while node:
             path2.append(node)
-            node = p_end[node]
+            node = p2[node]
         return path1 + path2
 
 
 # =====================================================
-# DRAW GRID
+# DRAW GRID (WITH BORDERS)
 # =====================================================
 
 def draw_grid(walls, start, target, visited, path, agent, placeholder):
@@ -209,8 +211,14 @@ def draw_grid(walls, start, target, visited, path, agent, placeholder):
     color_map[agent] = [0.0, 0.0, 1.0]
 
     ax.imshow(color_map)
-    ax.set_xticks([])
-    ax.set_yticks([])
+
+    # Draw grid lines (borders)
+    ax.set_xticks(np.arange(-0.5, cols, 1))
+    ax.set_yticks(np.arange(-0.5, rows, 1))
+    ax.grid(color='black', linestyle='-', linewidth=1)
+
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
 
     placeholder.pyplot(fig)
     plt.close(fig)
@@ -220,14 +228,14 @@ def draw_grid(walls, start, target, visited, path, agent, placeholder):
 # STREAMLIT UI
 # =====================================================
 
-st.set_page_config(page_title="Pathfinder", layout="wide")
+st.set_page_config(page_title="Complete Pathfinder", layout="wide")
 
 if "grid_size" not in st.session_state:
     st.session_state.grid_size = 10
     st.session_state.walls = np.zeros((10, 10), dtype=int)
 
 with st.sidebar:
-    st.header("Configuration")
+    st.header("Settings")
 
     size = st.slider("Grid Size", 5, 25, 10)
 
@@ -235,7 +243,7 @@ with st.sidebar:
         st.session_state.grid_size = size
         st.session_state.walls = np.zeros((size, size), dtype=int)
 
-    algo = st.selectbox("Select Algorithm",
+    algo = st.selectbox("Algorithm",
                         ["BFS", "DFS", "UCS", "DLS", "IDDFS", "Bidirectional"])
 
     dls_limit = None
@@ -255,16 +263,45 @@ with st.sidebar:
 col1, col2 = st.columns([1, 1.5])
 
 with col1:
+    st.subheader("Start / Target")
+
     sx = st.number_input("Start Row", 0, size - 1, 0)
     sy = st.number_input("Start Col", 0, size - 1, 0)
     tx = st.number_input("Target Row", 0, size - 1, size - 1)
     ty = st.number_input("Target Col", 0, size - 1, size - 1)
 
-start = (sx, sy)
-target = (tx, ty)
+    start = (sx, sy)
+    target = (tx, ty)
 
-st.session_state.walls[start] = 0
-st.session_state.walls[target] = 0
+    st.session_state.walls[start] = 0
+    st.session_state.walls[target] = 0
+
+    st.divider()
+    st.subheader("Wall Editor")
+
+    wall_input = st.text_input("Enter wall coordinate (row,col)")
+
+    colA, colB = st.columns(2)
+
+    with colA:
+        if st.button("Add Wall"):
+            try:
+                r, c = map(int, wall_input.split(","))
+                if (r, c) != start and (r, c) != target:
+                    st.session_state.walls[r, c] = 1
+                    st.rerun()
+            except:
+                st.error("Invalid format")
+
+    with colB:
+        if st.button("Remove Wall"):
+            try:
+                r, c = map(int, wall_input.split(","))
+                st.session_state.walls[r, c] = 0
+                st.rerun()
+            except:
+                st.error("Invalid format")
+
 
 with col2:
     placeholder = st.empty()
